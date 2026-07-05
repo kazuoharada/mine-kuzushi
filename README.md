@@ -6,6 +6,8 @@
 
 **▶ https://kazuoharada.github.io/mine-kuzushi/**
 
+マニュアル（ブロック図鑑・操作方法）: https://kazuoharada.github.io/mine-kuzushi/manual.html
+
 またはローカルで `index.html` をブラウザで開くだけ（依存なしの単一ファイル）。
 
 ## 操作
