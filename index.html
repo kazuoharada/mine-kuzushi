@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>マイン崩し</title>
 <style>
   html, body {
@@ -245,6 +248,12 @@ let particles = [], floaters = [];
 let shake = 0, msgTimer = 0, titleRot = 0;
 const keys = {};
 
+// HUD内のタッチボタン（一時停止・ミュート）
+const BTN = {
+  pause: { x: W - 44, y: 12, s: 32 },
+  mute:  { x: W - 84, y: 12, s: 32 },
+};
+
 // ===== レベル生成 =====
 function pickType(l, rng, bedCount) {
   const w = [
@@ -474,6 +483,45 @@ function drawBlocks() {
     }
   }
 }
+function drawBtnBase(b) {
+  ctx.fillStyle = '#2a2a36';
+  ctx.fillRect(b.x, b.y, b.s, b.s);
+  ctx.strokeStyle = '#55556a'; ctx.lineWidth = 2;
+  ctx.strokeRect(b.x + 1, b.y + 1, b.s - 2, b.s - 2);
+}
+function drawPauseBtn() {
+  const b = BTN.pause;
+  drawBtnBase(b);
+  ctx.fillStyle = '#e8e8f0';
+  if (state === 'pause') {
+    ctx.beginPath();
+    ctx.moveTo(b.x + 11, b.y + 8);
+    ctx.lineTo(b.x + 25, b.y + 16);
+    ctx.lineTo(b.x + 11, b.y + 24);
+    ctx.closePath(); ctx.fill();
+  } else {
+    ctx.fillRect(b.x + 9, b.y + 8, 5, 16);
+    ctx.fillRect(b.x + 18, b.y + 8, 5, 16);
+  }
+}
+function drawMuteBtn() {
+  const b = BTN.mute;
+  drawBtnBase(b);
+  ctx.fillStyle = '#e8e8f0';
+  ctx.beginPath();
+  ctx.moveTo(b.x + 7, b.y + 13); ctx.lineTo(b.x + 12, b.y + 13);
+  ctx.lineTo(b.x + 17, b.y + 8); ctx.lineTo(b.x + 17, b.y + 24);
+  ctx.lineTo(b.x + 12, b.y + 19); ctx.lineTo(b.x + 7, b.y + 19);
+  ctx.closePath(); ctx.fill();
+  if (muted) {
+    ctx.strokeStyle = '#e3373c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(b.x + 6, b.y + 26); ctx.lineTo(b.x + 26, b.y + 6); ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#e8e8f0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(b.x + 19, b.y + 16, 5, -0.9, 0.9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.x + 19, b.y + 16, 9, -0.9, 0.9); ctx.stroke();
+  }
+}
 function drawHUD() {
   ctx.fillStyle = '#1a1a24';
   ctx.fillRect(0, 0, W, HUD);
@@ -483,8 +531,9 @@ function drawHUD() {
   txt(`ハイスコア ${hiscore}`, 14, 44, 12, '#9a9aa8', 'left');
   txt(`レベル ${level}`, W / 2, 32, 18, '#ffd83d');
   for (let i = 0; i < 3; i++)
-    ctx.drawImage(i < lives ? HEART : HEART_EMPTY, W - 14 - (3 - i) * 27, 22);
-  if (muted) txt('ミュート中(M)', W - 14, 50, 10, '#666', 'right');
+    ctx.drawImage(i < lives ? HEART : HEART_EMPTY, W - 96 - (3 - i) * 27, 22);
+  if (state === 'play' || state === 'pause') drawPauseBtn();
+  drawMuteBtn();
 }
 function drawGround() {
   // タイトル画面の地面（草付き土ブロック）
@@ -509,9 +558,9 @@ function draw() {
     txt('マイン崩し', W / 2, 300, 52, '#fff');
     txt('- MINE KUZUSHI -', W / 2, 340, 14, '#3aa32f');
     txt('クリック / タップ でスタート', W / 2, 410, 18, Math.sin(titleRot * 4) > -0.3 ? '#ffd83d' : '#665a20');
-    txt('マウス / ←→キー : 移動', W / 2, 460, 13, '#9a9aa8');
-    txt('クリック / スペース : ピッケル発射', W / 2, 482, 13, '#9a9aa8');
-    txt('M : ミュート   P : 一時停止', W / 2, 504, 13, '#9a9aa8');
+    txt('スライド / マウス / ←→キー : 移動', W / 2, 460, 13, '#9a9aa8');
+    txt('タップ / クリック / スペース : 発射', W / 2, 482, 13, '#9a9aa8');
+    txt('一時停止・ミュートは右上ボタン (P / Mキー)', W / 2, 504, 13, '#9a9aa8');
     // ブロック凡例
     const legend = ['dirt', 'stone', 'iron', 'diamond', 'tnt'];
     const lw = legend.length * (BS + 26) - 26;
@@ -544,15 +593,13 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
-  drawHUD();
-
   if (state === 'play' && ball.onPaddle)
-    txt('クリック / スペース で発射', W / 2, H - 110, 14, Math.sin(titleRot * 4) > -0.3 ? '#ffd83d' : '#665a20');
+    txt('タップ / クリック / スペース で発射', W / 2, H - 110, 14, Math.sin(titleRot * 4) > -0.3 ? '#ffd83d' : '#665a20');
 
   if (state === 'pause') {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
     txt('一時停止中', W / 2, H / 2 - 10, 32);
-    txt('P で再開', W / 2, H / 2 + 30, 14, '#9a9aa8');
+    txt('タップ / P で再開', W / 2, H / 2 + 30, 14, '#9a9aa8');
   }
   if (state === 'clear') {
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, W, H);
@@ -565,42 +612,71 @@ function draw() {
     txt(`スコア ${score}`, W / 2, H / 2, 22);
     if (score >= hiscore && score > 0) txt('ハイスコア更新!', W / 2, H / 2 + 34, 16, '#ffd83d');
     else txt(`ハイスコア ${hiscore}`, W / 2, H / 2 + 34, 14, '#9a9aa8');
-    txt('クリックでもう一度', W / 2, H / 2 + 80, 16, Math.sin(titleRot * 4) > -0.3 ? '#ffd83d' : '#665a20');
+    txt('タップ / クリック でもう一度', W / 2, H / 2 + 80, 16, Math.sin(titleRot * 4) > -0.3 ? '#ffd83d' : '#665a20');
   }
+
+  drawHUD();
   ctx.restore();
 }
 
 // ===== 入力 =====
 function canvasPos(e) {
   const rect = cv.getBoundingClientRect();
-  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-  return cx * (W / rect.width);
+  const p = e.touches ? e.touches[0] : e;
+  return {
+    x: (p.clientX - rect.left) * (W / rect.width),
+    y: (p.clientY - rect.top) * (H / rect.height),
+  };
 }
-function movePaddle(e) {
+function movePaddle(pos) {
   if (state !== 'play' && state !== 'clear') return;
-  const x = canvasPos(e);
-  paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w / 2));
+  paddle.x = Math.max(0, Math.min(W - paddle.w, pos.x - paddle.w / 2));
 }
-function primaryAction() {
+function inBtn(b, pos) {
+  return pos.x >= b.x && pos.x <= b.x + b.s && pos.y >= b.y && pos.y <= b.y + b.s;
+}
+function onButton(pos) {
+  return state !== 'title' && (
+    inBtn(BTN.mute, pos) ||
+    ((state === 'play' || state === 'pause') && inBtn(BTN.pause, pos))
+  );
+}
+function togglePause() {
+  if (state === 'play') state = 'pause';
+  else if (state === 'pause') state = 'play';
+}
+function pressAt(pos) {
   initAudio();
+  if (onButton(pos)) {
+    if (inBtn(BTN.mute, pos)) muted = !muted;
+    else togglePause();
+    return;
+  }
   if (state === 'title') startGame();
   else if (state === 'play') launchBall();
+  else if (state === 'pause') state = 'play';
   else if (state === 'over') startGame();
 }
-cv.addEventListener('mousemove', movePaddle);
-cv.addEventListener('touchmove', e => { e.preventDefault(); movePaddle(e); }, { passive: false });
-cv.addEventListener('mousedown', primaryAction);
-cv.addEventListener('touchstart', e => { e.preventDefault(); movePaddle(e); primaryAction(); }, { passive: false });
+cv.addEventListener('mousemove', e => movePaddle(canvasPos(e)));
+cv.addEventListener('touchmove', e => { e.preventDefault(); movePaddle(canvasPos(e)); }, { passive: false });
+cv.addEventListener('mousedown', e => pressAt(canvasPos(e)));
+cv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const pos = canvasPos(e);
+  if (!onButton(pos)) movePaddle(pos);
+  pressAt(pos);
+}, { passive: false });
 addEventListener('keydown', e => {
   keys[e.key] = true;
-  if (e.key === ' ') { e.preventDefault(); primaryAction(); }
+  if (e.key === ' ') { e.preventDefault(); pressAt({ x: -1, y: -1 }); }
   if (e.key === 'm' || e.key === 'M') muted = !muted;
-  if (e.key === 'p' || e.key === 'P') {
-    if (state === 'play') state = 'pause';
-    else if (state === 'pause') state = 'play';
-  }
+  if (e.key === 'p' || e.key === 'P') togglePause();
 });
 addEventListener('keyup', e => { keys[e.key] = false; });
+// バックグラウンドに回ったら自動で一時停止（スマホのアプリ切替対策）
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state === 'play') state = 'pause';
+});
 
 // デバッグ用（テスト検証で参照）
 window.__game = {
@@ -610,6 +686,7 @@ window.__game = {
   get lives() { return lives; },
   get ball() { return ball; },
   get blocks() { return blocks; },
+  get muted() { return muted; },
 };
 
 // ===== メインループ =====
